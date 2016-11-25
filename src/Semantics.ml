@@ -6,21 +6,52 @@
 
 open Z3
 
-(* Create a variable in the z3 context with the correct syntax x$i *)
+let ht = Hashtbl.create 100;;
+
 let z3_var ctx var i =
   Arithmetic.Integer.mk_const_s ctx (var ^ "$" ^ (string_of_int i))
 
-(* Define new operations that take a list of expressions
- and return a list of expressions,
- TODO:  ensure the denominator is non zero *)
+let add_unchanged ctx xi f =
+  let key = (Expr.to_string xi) in
+  Hashtbl.add ht key f
+
+let add_guard ctx f =
+  let key = "guard" in
+  Hashtbl.add ht key f 
+
+let add_assigned ctx xi f =
+  let key = (Expr.to_string xi) in
+  Hashtbl.replace ht key f
+
+let add_non_zero ctx xi f =
+  let key = (Expr.to_string xi) ^ "non-zero" in
+  Hashtbl.add ht key f
+
+let apply_skip ctx i var =
+(* Define two variables, x$i and x$(i+1) before and after the operation *)
+  let xi =  z3_var ctx var i
+  and xi1 = z3_var ctx var (i+1)
+  in
+  let f = Boolean.mk_eq ctx xi  xi1 in
+  add_unchanged ctx xi f; ()
+
 let div ctx expr_list =
   let a = List.nth expr_list 0
   and b = List.nth expr_list 1
   in
-  Arithmetic.mk_div ctx a b
-
+  let division = Arithmetic.mk_div ctx a b
+  and zero = Arithmetic.Integer.mk_numeral_i ctx 0                  
+  in
+  let eq_zero = Boolean.mk_eq ctx b zero in
+  let non_zero = Boolean.mk_not ctx eq_zero in
   
-(* Evaluation of an expression. *)
+  (*arithmetic_constraints := List.append !arithmetic_constraints [non_zero];
+  Format.printf "Arithmetic constraints is \n";
+  List.iter print !arithmetic_constraints;*)
+  add_non_zero ctx b non_zero;
+  division
+
+(* Evaluation of an expression.*)
 let rec eval ctx e i =
     match e with
     | Command.Expression.Cst c -> Arithmetic.Integer.mk_numeral_i ctx c
@@ -35,67 +66,66 @@ let rec eval ctx e i =
        in
     fun_op ctx [(eval ctx e i); (eval ctx e' i)]
 
-(* Check if two z3 variables are equal *)           
-let z3_variable_equality ctx x y =
-  (* to verify equality, we check if x and y can be different,
-     if the formula is unsat, then it is the same variable *)
-  let x_equals_y = Boolean.mk_eq ctx x y in
-  let x_diff_y = Boolean.mk_not ctx x_equals_y in
-  let solver = (Solver.mk_simple_solver ctx) in
-  Solver.add solver [x_diff_y] ;
-  let status = Solver.check solver [] in
-  match status with
-  | Solver.UNSATISFIABLE -> true
-  | Solver.SATISFIABLE
-  | Solver.UNKNOWN -> false
-
-
-
-
-let apply_assign ctx a var i =
+let apply_guard ctx p i vars =
+   let (expr, op, expr') = p in
+   let z3_expr =  eval ctx expr i
+   and z3_expr' = eval ctx expr' i
+   in
+   let z3_guard_formula =
+     match op with
+     | Command.Predicate.Eq  -> Boolean.mk_eq ctx  z3_expr z3_expr'
+     | Command.Predicate.Lst -> Arithmetic.mk_lt ctx z3_expr z3_expr'
+     | Command.Predicate.Gst -> Arithmetic.mk_gt ctx z3_expr z3_expr'
+     | Command.Predicate.Leq -> Arithmetic.mk_le ctx z3_expr z3_expr'
+     | Command.Predicate.Geq -> Arithmetic.mk_ge ctx z3_expr z3_expr'
+   in
+   add_guard ctx z3_guard_formula;
+   (* Iterate through vars and add unchanged formula for each variable *)    
+   List.map (apply_skip ctx  i ) vars;
+   ()
+     
+let apply_assign ctx a i vars =
   let (v, exp) = a in
-  let xi =  z3_var ctx var i
-  and xi1 =  z3_var ctx var (i+1)
-  and affected_xi = z3_var ctx v i
+  let affected_xi = z3_var ctx v i
+  and affected_xi1 = z3_var ctx v (i+1)
   in
-  (* Check if the current variable is the affected variable *)
-  let equality = z3_variable_equality ctx xi affected_xi in
-  if equality then
-    (
-      match exp with
-      (* constant is assigned to var *)
-      | Command.Expression.Cst cst ->
-         (* Create the integer numeral for the constant. *)
-         let z3_cst  = Arithmetic.Integer.mk_numeral_i ctx cst in
-         let formula = Boolean.mk_eq ctx xi1 z3_cst in
-         formula
-      (* another variable is assigned to var *)
-      | Command.Expression.Var assigned_variable ->  
-         (* create the variable in Z3 context y$i *)      
-         let z3_assigned_variable =  z3_var ctx assigned_variable i in
-         Boolean.mk_eq ctx xi1 z3_assigned_variable
-      (* an expression is assigned to var *)
-      | Command.Expression.Op (e, op, e') ->
-          let z3_assigned_expression = eval ctx exp i in
-          Boolean.mk_eq ctx xi1 z3_assigned_expression
-    )
-  (* If not we just want x$i = x$(i+1) *)
-  else
-    Boolean.mk_eq ctx xi  xi1
+  (* Iterate through vars and add unchanged formula for each variable *)    
+  List.map (apply_skip ctx  i ) vars;
+  (* Replace the binding of the affected variable *)
+  let z3_assign_formula =
+    match exp with
+    (* constant is assigned to var *)
+    | Command.Expression.Cst cst ->
+       (* Create the integer numeral for the constant. *)
+       let z3_cst  = Arithmetic.Integer.mk_numeral_i ctx cst in
+       Boolean.mk_eq ctx affected_xi1 z3_cst
+    (* another variable is assigned to var *)
+    | Command.Expression.Var assigned_variable ->  
+       (* create the variable in Z3 context y$i *)      
+       let z3_assigned_variable =  z3_var ctx assigned_variable i in
+       Boolean.mk_eq ctx affected_xi1 z3_assigned_variable
+    (* an expression is assigned to var *)
+    | Command.Expression.Op (e, op, e') ->
+       let z3_assigned_expression = eval ctx exp i in
+       Boolean.mk_eq ctx affected_xi1 z3_assigned_expression
+  in
+  add_assigned ctx affected_xi z3_assign_formula;
+  ()
+  
+let formula ctx vars i cmd =
+  (* reset arithmetic constraints to empty list *)
+  Hashtbl.reset ht;
 
-                  
-let transform_var ctx i cmd var =
-  (* Define two variables, x$i and x$(i+1) before and after the operation *)
-  let xi =  z3_var ctx var i
-  and xi1 = z3_var ctx var (i+1)
-  in
   (* What sort is the cmd operation *)
   match cmd with
-  | Command.Skip -> Boolean.mk_eq ctx xi  xi1   
-  | Command.Guard p -> Boolean.mk_eq ctx xi  xi1 (* TODO *)
-  | Command.Assign (v, e) -> apply_assign ctx (v, e) var i
-                            
-let formula ctx vars i cmd =
-  (* Iterate through vars and get the corresponding boolean expression *)
-  List.map
-    (transform_var ctx  i cmd) vars
+  | Command.Skip ->
+     (* Iterate through vars and add unchanged formula for each variable*)
+     List.map (apply_skip ctx  i ) vars;
+     Hashtbl.fold (fun _ v acc -> v :: acc) ht []
+  | Command.Guard p ->
+     apply_guard ctx p i vars;
+     Hashtbl.fold (fun _ v acc -> v :: acc) ht []
+  | Command.Assign (v, e) ->
+     apply_assign ctx (v,e) i vars;
+     Hashtbl.fold (fun _ v acc -> v :: acc) ht []
+
