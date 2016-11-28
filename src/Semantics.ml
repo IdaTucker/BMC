@@ -11,19 +11,19 @@ let ht = Hashtbl.create 100;;
 let z3_var ctx var i =
   Arithmetic.Integer.mk_const_s ctx (var ^ "$" ^ (string_of_int i))
 
-let add_unchanged ctx xi f =
+let add_unchanged xi f =
   let key = (Expr.to_string xi) in
   Hashtbl.add ht key f
 
-let add_guard ctx f =
+let add_guard f =
   let key = "guard" in
   Hashtbl.add ht key f 
 
-let add_assigned ctx xi f =
+let add_assigned xi f =
   let key = (Expr.to_string xi) in
   Hashtbl.replace ht key f
 
-let add_non_zero ctx xi f =
+let add_non_zero xi f =
   let key = (Expr.to_string xi) ^ "non-zero" in
   Hashtbl.add ht key f
 
@@ -33,7 +33,7 @@ let apply_skip ctx i var =
   and xi1 = z3_var ctx var (i+1)
   in
   let f = Boolean.mk_eq ctx xi  xi1 in
-  add_unchanged ctx xi f; ()
+  add_unchanged xi f; ()
 
 let div ctx expr_list =
   let a = List.nth expr_list 0
@@ -48,7 +48,7 @@ let div ctx expr_list =
   (*arithmetic_constraints := List.append !arithmetic_constraints [non_zero];
   Format.printf "Arithmetic constraints is \n";
   List.iter print !arithmetic_constraints;*)
-  add_non_zero ctx b non_zero;
+  add_non_zero b non_zero;
   division
 
 (* Evaluation of an expression.*)
@@ -79,9 +79,9 @@ let apply_guard ctx p i vars =
      | Command.Predicate.Leq -> Arithmetic.mk_le ctx z3_expr z3_expr'
      | Command.Predicate.Geq -> Arithmetic.mk_ge ctx z3_expr z3_expr'
    in
-   add_guard ctx z3_guard_formula;
+   add_guard z3_guard_formula;
    (* Iterate through vars and add unchanged formula for each variable *)    
-   List.map (apply_skip ctx  i ) vars;
+   List.iter (apply_skip ctx  i ) vars;
    ()
      
 let apply_assign ctx a i vars =
@@ -90,7 +90,7 @@ let apply_assign ctx a i vars =
   and affected_xi1 = z3_var ctx v (i+1)
   in
   (* Iterate through vars and add unchanged formula for each variable *)    
-  List.map (apply_skip ctx  i ) vars;
+  List.iter (apply_skip ctx  i ) vars;
   (* Replace the binding of the affected variable *)
   let z3_assign_formula =
     match exp with
@@ -109,7 +109,7 @@ let apply_assign ctx a i vars =
        let z3_assigned_expression = eval ctx exp i in
        Boolean.mk_eq ctx affected_xi1 z3_assigned_expression
   in
-  add_assigned ctx affected_xi z3_assign_formula;
+  add_assigned affected_xi z3_assign_formula;
   ()
   
 let formula ctx vars i cmd =
@@ -120,7 +120,7 @@ let formula ctx vars i cmd =
   match cmd with
   | Command.Skip ->
      (* Iterate through vars and add unchanged formula for each variable*)
-     List.map (apply_skip ctx  i ) vars;
+     List.iter (apply_skip ctx  i ) vars;
      Hashtbl.fold (fun _ v acc -> v :: acc) ht []
   | Command.Guard p ->
      apply_guard ctx p i vars;
