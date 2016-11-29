@@ -31,8 +31,10 @@ let aux cmd k expected =
 let test_assign () =
   aux (x := cst 3) 0 "{(= y$0 y$1), (= z$0 z$1), (= x$1 3)}";
   aux (z := x - y) 2 "{(= z$3 (- x$2 y$2)), (= x$2 x$3), (= y$2 y$3)}" ;
-  aux (z := x / y) 1 "{(= z$2 (div x$1 y$1)), (= x$1 x$2), (not (= y$1 0)), (= y$1 y$2)}"
-
+  aux (z := x / y) 1 "{(= z$2 (div x$1 y$1)), (= x$1 x$2), (not (= y$1 0)), (= y$1 y$2)}";
+  aux (z := x / (y + cst 3)) 1 "{(= z$2 (div x$1 (+ y$1 3))), (= x$1 x$2), (= y$1 y$2), (not (= (+ y$1 3) 0))}";
+  aux (z := x / cst 2) 1 "{(= z$2 (div x$1 2)), (= x$1 x$2), (= y$1 y$2)}"
+      
 let test_guard () =
   aux (x <= y + z) 0 "{(<= x$0 (+ y$0 z$0)), (= y$0 y$1), (= z$0 z$1), (= x$0 x$1)}" ;
   aux (x + cst 5 > y / z) 0 "{(> (+ x$0 5) (div y$0 z$0)), (= y$0 y$1), (= z$0 z$1), (not (= z$0 0)), (= x$0 x$1)}"

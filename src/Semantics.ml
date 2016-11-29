@@ -40,16 +40,16 @@ let div ctx expr_list =
   and b = List.nth expr_list 1
   in
   let division = Arithmetic.mk_div ctx a b
-  and zero = Arithmetic.Integer.mk_numeral_i ctx 0                  
   in
-  let eq_zero = Boolean.mk_eq ctx b zero in
-  let non_zero = Boolean.mk_not ctx eq_zero in
-  
-  (*arithmetic_constraints := List.append !arithmetic_constraints [non_zero];
-  Format.printf "Arithmetic constraints is \n";
-  List.iter print !arithmetic_constraints;*)
-  add_non_zero b non_zero;
-  division
+  if Arithmetic.is_int_numeral b then
+    division
+  else
+    let zero = Arithmetic.Integer.mk_numeral_i ctx 0                  
+    in
+    let eq_zero = Boolean.mk_eq ctx b zero in
+    let non_zero = Boolean.mk_not ctx eq_zero in
+    add_non_zero b non_zero;
+    division
 
 (* Evaluation of an expression.*)
 let rec eval ctx e i =
