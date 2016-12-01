@@ -33,7 +33,6 @@ let is_satisfiable solver =
   end
 
 let rec depth_first_search ctx solver automaton bound (cmd, current) =
-  print_int bound ;
   if (!bad_path <> []) then
     ()
   else if (!depth = bound) then
@@ -56,7 +55,7 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
           if (is_satisfiable solver = false) then
             (
               Solver.pop solver 1;
-              path := List.tl  !path;
+              path := List.tl !path; (* Bug here *)
               ()
             )
           else if (current = (Automaton.final automaton)) then
@@ -65,17 +64,19 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
               ()
             )
           else
+            let next_bound = bound + 1 in
             List.iter
-              (depth_first_search ctx solver automaton (bound + 1) ) children;
+              (depth_first_search ctx solver automaton next_bound ) children;
             Solver.pop solver 1;
             ()
         )
       else
         (
-      List.iter
-        (depth_first_search ctx solver automaton (bound + 1) ) children;
-      Solver.pop solver 1;
-      ()
+          let next_bound = bound + 1 in
+          List.iter
+            (depth_first_search ctx solver automaton next_bound ) children;
+          Solver.pop solver 1;
+          ()
         )
     )
     
