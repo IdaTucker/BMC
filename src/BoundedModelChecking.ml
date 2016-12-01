@@ -37,10 +37,6 @@ let is_satisfiable solver =
 let rec depth_first_search ctx solver automaton bound (cmd, current) =
   if (Hashtbl.mem visited_ht current) then
     (
-      Format.printf "Already visited \n";
-      Format.printf "Depth is ";
-      let s = string_of_int !depth in
-      Format.printf "%s \n" s ;
       ()
     )
   else
@@ -48,15 +44,11 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
       Hashtbl.add visited_ht current 1;
       if (!bad_path <> []) then
         (
-          Format.printf "Bad path \n";
-          Format.printf "Depth is %s " (string_of_int !depth) ;
           ()
         )
       else if (!depth = bound) then
         (
           bound_reached := true;
-          Format.printf "Bound reached \n";
-          Format.printf "Depth is %s \n" (string_of_int !depth) ;
           ()
         )
       else
@@ -67,24 +59,15 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
           if (current <> (Automaton.initial automaton)) then
             (
               depth := !depth + 1;
-              Format.printf "Other state \n";
-              Format.printf "Depth is %s \n\n" (string_of_int !depth) ;
               Solver.push solver;
               let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
               Solver.add solver [f] ;
               path := List.append [(cmd, current)] !path;
-              (* 
-          let key = string_of_int depth in
-          Hashtbl.add path_ht key (cmd, current)
-               *)
               if (is_satisfiable solver = false) then
                 (
                   Format.printf "Popping from slover for unsat " ;
                   Solver.pop solver 1;
-                  Format.printf "... done\n " ;
-                  Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
                   depth := !depth - 1;
-                  Format.printf "to %s \n" (string_of_int !depth) ;
                   path := List.tl !path;
                   ()
                 )
@@ -98,12 +81,8 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
                   (*let next_bound = bound + 1 in*)
                   List.iter
                     ( depth_first_search ctx solver automaton bound ) children;
-                  Format.printf "Popping from slover for other start " ;
                   Solver.pop solver 1;
-                  Format.printf "... done\n " ;
-                  Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
                   depth := !depth - 1;
-                  Format.printf "to %s \n" (string_of_int !depth) ;
                   ()
                 )
             )
@@ -111,16 +90,9 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
             (
               (*let next_bound = bound + 1 in*)
               depth := !depth + 1;
-              Format.printf "Initial state \n";
-              Format.printf "Depth is %s \n\n" (string_of_int !depth) ;
               List.iter
                 (depth_first_search ctx solver automaton bound ) children;
-              Format.printf "Poping from slover for init start " ;
-              Format.printf "... done\n " ;
-              Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
               depth := !depth - 1;
-              Format.printf "to %s \n" (string_of_int !depth) ;
-              
               ()
             )
         )

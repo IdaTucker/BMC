@@ -291,7 +291,59 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
 \subsection{Infinite Descent}
+
+\begin{tikzpicture}[%
+    ->,
+    shorten >=1pt,
+    >=stealth,
+    node distance=7cm,
+    noname/.style={%
+      ellipse,
+      minimum width=5em,
+      minimum height=3em,
+      draw
+    }
+  ]
+    \node[noname] (0)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=2cm and 1cm,below right=of 0]   {$q_{1}$};
+    \node[noname] (2) [node distance=2cm and 1cm,below left=of 0]    {$q_{2}$};
+    \node[noname, red] (bad) [node distance=5cm,below=of 0]          {$r$};
+
+    \path (0) edge []                    node {}       (2)
+          (0) edge [right]                    node {$x:=0$} (1)
+          (1) edge [right]    node {$x == 3$} (bad)
+          (2) edge [below]                    node {$x:=1$} (1)
+          (bad) edge [loop left]                    node {$x:=x+1$} (bad)
+          ;
+  \end{tikzpicture}
+
 \subsection{Pre Only}
+
+\begin{tikzpicture}[%
+    ->,
+    shorten >=1pt,
+    >=stealth,
+    node distance=7cm,
+    noname/.style={%
+      ellipse,
+      minimum width=5em,
+      minimum height=3em,
+      draw
+    }
+  ]
+    \node[noname] (0)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=2cm, right=of 0]   {$q_{1}$};
+    \node[noname] (2) [node distance=2cm, right=of 1]    {$q_{2}$};
+    \node[noname] (3) [node distance=2cm, right=of 2]    {$q_{3}$};
+    \node[noname, red] (bad) [node distance=2cm,right=of 3]          {$q_{bad}$};
+
+    \path (0) edge [above]                    node {$(x*y) >= 0$}       (1)
+          (1) edge [above]                    node {$z:=y$} (2)
+          (2) edge [above]                     node {$x<0$} (3)
+          (3) edge [above]                    node {$z>=3$} (bad)
+          ;
+  \end{tikzpicture}
+
 \subsection{Sign Non Zero Crucial}
 \subsection{Sign Non Zero Crucial Variant}
 \section{Implementation of BoundedModelChecking.ml}
