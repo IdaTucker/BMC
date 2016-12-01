@@ -41,15 +41,12 @@ let div ctx expr_list =
   in
   let division = Arithmetic.mk_div ctx a b
   in
-  if Arithmetic.is_int_numeral b then
-    division
-  else
-    let zero = Arithmetic.Integer.mk_numeral_i ctx 0                  
-    in
-    let eq_zero = Boolean.mk_eq ctx b zero in
-    let non_zero = Boolean.mk_not ctx eq_zero in
-    add_non_zero b non_zero;
-    division
+  let zero = Arithmetic.Integer.mk_numeral_i ctx 0                  
+  in
+  let eq_zero = Boolean.mk_eq ctx b zero in
+  let non_zero = Boolean.mk_not ctx eq_zero in
+  add_non_zero b non_zero;
+  division
 
 (* Evaluation of an expression.*)
 let rec eval ctx e i =

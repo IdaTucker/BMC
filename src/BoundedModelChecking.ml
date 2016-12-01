@@ -10,6 +10,8 @@
  * exploration of the program automaton (viewed as a graph).
  *)
 open Z3
+(* let path_ht = Hashtbl.create 10;;*)
+let visited_ht = Hashtbl.create 100;;
 let path = ref [];;
 let bad_path = ref [];;
 let bound_reached = ref false;;
@@ -33,70 +35,125 @@ let is_satisfiable solver =
   end
 
 let rec depth_first_search ctx solver automaton bound (cmd, current) =
-  if (!bad_path <> []) then
-    ()
-  else if (!depth = bound) then
+  if (Hashtbl.mem visited_ht current) then
     (
-      bound_reached := true;
+      Format.printf "Already visited \n";
+      Format.printf "Depth is ";
+      let s = string_of_int !depth in
+      Format.printf "%s \n" s ;
       ()
     )
   else
     (
-      let vars =  Automaton.variables automaton
-      and children = Automaton.succ automaton current
-      in
-      if (current <> (Automaton.initial automaton)) then
+      Hashtbl.add visited_ht current 1;
+      if (!bad_path <> []) then
         (
-          depth := !depth + 1;
-          Solver.push solver;
-          let f = Boolean.mk_and ctx (Semantics.formula ctx vars bound cmd) in
-          Solver.add solver [f] ;
-          path := List.append [(cmd, current)] !path;
-          if (is_satisfiable solver = false) then
-            (
-              Solver.pop solver 1;
-              path := List.tl !path; (* Bug here *)
-              ()
-            )
-          else if (current = (Automaton.final automaton)) then
-            (
-              bad_path := !path;
-              ()
-            )
-          else
-            let next_bound = bound + 1 in
-            List.iter
-              (depth_first_search ctx solver automaton next_bound ) children;
-            Solver.pop solver 1;
-            ()
+          Format.printf "Bad path \n";
+          Format.printf "Depth is %s " (string_of_int !depth) ;
+          ()
+        )
+      else if (!depth = bound) then
+        (
+          bound_reached := true;
+          Format.printf "Bound reached \n";
+          Format.printf "Depth is %s \n" (string_of_int !depth) ;
+          ()
         )
       else
         (
-          let next_bound = bound + 1 in
-          List.iter
-            (depth_first_search ctx solver automaton next_bound ) children;
-          Solver.pop solver 1;
-          ()
+          let vars =  Automaton.variables automaton
+          and children = Automaton.succ automaton current
+          in
+          if (current <> (Automaton.initial automaton)) then
+            (
+              depth := !depth + 1;
+              Format.printf "Other state \n";
+              Format.printf "Depth is %s \n\n" (string_of_int !depth) ;
+              Solver.push solver;
+              let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
+              Solver.add solver [f] ;
+              path := List.append [(cmd, current)] !path;
+              (* 
+          let key = string_of_int depth in
+          Hashtbl.add path_ht key (cmd, current)
+               *)
+              if (is_satisfiable solver = false) then
+                (
+                  Format.printf "Popping from slover for unsat " ;
+                  Solver.pop solver 1;
+                  Format.printf "... done\n " ;
+                  Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
+                  depth := !depth - 1;
+                  Format.printf "to %s \n" (string_of_int !depth) ;
+                  path := List.tl !path;
+                  ()
+                )
+              else if (current = (Automaton.final automaton)) then
+                (
+                  bad_path := !path;
+                  ()
+                )
+              else
+                (
+                  (*let next_bound = bound + 1 in*)
+                  List.iter
+                    ( depth_first_search ctx solver automaton bound ) children;
+                  Format.printf "Popping from slover for other start " ;
+                  Solver.pop solver 1;
+                  Format.printf "... done\n " ;
+                  Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
+                  depth := !depth - 1;
+                  Format.printf "to %s \n" (string_of_int !depth) ;
+                  ()
+                )
+            )
+          else
+            (
+              (*let next_bound = bound + 1 in*)
+              depth := !depth + 1;
+              Format.printf "Initial state \n";
+              Format.printf "Depth is %s \n\n" (string_of_int !depth) ;
+              List.iter
+                (depth_first_search ctx solver automaton bound ) children;
+              Format.printf "Poping from slover for init start " ;
+              Format.printf "... done\n " ;
+              Format.printf "Decreasing depth from %s " (string_of_int !depth) ;
+              depth := !depth - 1;
+              Format.printf "to %s \n" (string_of_int !depth) ;
+              
+              ()
+            )
         )
     )
-    
 
 
 let search automaton bound =
-  Format.printf "Beginning of search";
+  Format.printf "Beginning of search\n";
   depth := 0;
+  Hashtbl.reset visited_ht;
+  bound_reached := false;
   let ctx = mk_context []
   in
   let init = Automaton.initial automaton
   and solver = (Solver.mk_simple_solver ctx) 
   in
   depth_first_search ctx solver automaton bound (Command.Skip, init);
+  Format.printf "Bound is reached %s \n" (string_of_bool !bound_reached) ;
+
+  (* If bad_path is not empty we have found a valid path that leads to the bad state *) 
   if !bad_path <> [] then
-    Path !bad_path
+    (
+      let ordered_bad_path = List.rev !bad_path in
+      Path ordered_bad_path
+    )
+  (* Otherwise, if the bound has been reached,
+     there is no feasable path of length <= bound *)
   else if !bound_reached then
-    Empty true
-  else
     Empty false
+          
+  (* Otherwise the program is safe *)      
+  else
+    Empty true
 
                        
     
