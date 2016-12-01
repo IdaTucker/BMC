@@ -5,6 +5,8 @@ BUILD_FLAGS = -use-ocamlfind -use-menhir
 DOC_FLAGS   = -charset UTF-8, -stars, -colorize-code, -sort,
 DOC_FLAGS  += -hide Pervasives, -hide-warnings
 REPORT = report.tex
+SRC = src/
+TEST = test/
 
 # Default target
 all: bmc.d.byte
@@ -24,7 +26,7 @@ test: FORCE runtests.d.byte
 
 clean: FORCE
 	ocamlbuild -quiet -clean
-	rm -rf report.aux report.log report.out	report.pdf report.pyg *~
+	rm -rf report.aux report.log report.out	report.pdf report.pyg *~ $(SRC)*~ $(TEST)*~
 
 
 FORCE:
