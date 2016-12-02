@@ -11,6 +11,7 @@
 \usepackage{tikz}
 \usetikzlibrary{positioning,shapes.geometric}
 \usepackage{minted}
+\usepackage{amsfonts}
 
 
 \usepackage[final]{hyperref} % adds hyper links inside the generated pdf file
@@ -21,6 +22,7 @@
 	filecolor=magenta,     % color of file links
 	urlcolor=blue         
 }
+\definecolor{ao(english)}{rgb}{0.0, 0.5, 0.0}
 \usepackage{xcolor}
 %\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
 %\let\oldtriangleleft\triangleleft
@@ -120,6 +122,9 @@ i.e. the binding \textcolor{purple}{x\$i}, $x^{(i)}$ = $x^{(i+1)}$ becomes \text
 
 In order to build the assignment formula we match the expression assigned to $x^{(i)}$ with either a constant, another variable or an expression. Again if $e$ is an expression we use the \textcolor{blue}{eval} function to evaluate the expression.
 
+  
+\section{Implementation of BoundedModelChecking.ml}
+
 
 \section{Tests}
 Added test to \texttt{semantics.assign} for the division of an expression by a constant. We add a formula that asserts the integer constant is non zero.
@@ -133,8 +138,14 @@ Added test to \texttt{semantics.assign} for the division of an expression by an 
 				(= y$1 y$2), (not (= (+ y$1 3) 0))}'
 \end{minted}
 
-\section{Automaton examples}
-\subsection{Division by zero}
+\subsection{New Automatons}
+For testing purposes, additional automatons have been created in the \texttt{examples} folder in order to test edge cases, the case where no feasible path is found in less than 10 iterations, potential infinite loops.
+\subsubsection{Initial state is bad state}
+\subsubsection{Initial state skips to bad state}
+\subsubsection{Final state reached in 11 iterations}
+\subsubsection{Final state reached in 11 iterations}
+\subsection{Existing Automaton examples}
+\subsubsection{Division by zero}
 The division by zero automaton should not lead to a bad state, indeed 
 \begin{itemize}
 \item $q_{ini} \rightarrow q_1 $: enforces $x:=-1$, so we cannot have $y:=\frac{3}{x+1}$ we would have a division by zero, this produces an UNSAT formula.
@@ -171,7 +182,7 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
 
-\subsection{Constant Propagation}
+\subsubsection{Constant Propagation}
 
 \begin{tikzpicture}[%
     ->,
@@ -199,7 +210,22 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
 
-\subsection{Inductive Invariants Exercise 1}
+Clearly the constant propagation automaton is unsafe: for any initial value of x and y and for z=3, the final state $q_{bad}$ is reached. The program finds the following feasible path to $q_{bad}$:
+
+\begin{minted}{c}
+Feasible path:
+   q_1
+     >> x := 1 >>
+   q_2
+      >> y := 2 >>
+   q_4
+      >> z := (x + y) >>
+   q_5
+
+\end{minted}
+
+
+\subsubsection{Inductive Invariants Exercise 1}
 \begin{tikzpicture}[%
     ->,
     shorten >=1pt,
@@ -223,7 +249,18 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
   
-\subsection{Inductive Invariants Exercise 2}
+In this exercise we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $\exists k \in \mathbb{Z} : x = 3*k$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}
+
+Therefore the program should return that there is no feasable path.
+
+\textbf{\textcolor{teal}{PASS}}
+
+\subsubsection{Inductive Invariants Exercise 2}
 
 \begin{tikzpicture}[%
     ->,
@@ -253,7 +290,21 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
 
-\subsection{Running Example}
+In this exercise we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $y > 0$
+\item $\varphi _{q_2}$ = $(y>0 \Rightarrow x \geq 0) \wedge (y=0 \Rightarrow x>0)$
+\item $\varphi _{q_3}$ = $(y\geq 0 \Rightarrow x > 0)$
+\item $\varphi _{q_4}$ = $(y=0 \wedge x > 0)$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}
+
+Therefore the program should return that there is no feasable path.
+
+\textbf{\textcolor{teal}{PASS}}
+
+\subsubsection{Running Example}
 \begin{tikzpicture}[%
     ->,
     shorten >=1pt,
@@ -290,7 +341,12 @@ The division by zero automaton should not lead to a bad state, indeed
           (12) edge [above]   node {$x<=0$} (bad)
           ;
   \end{tikzpicture}
-\subsection{Infinite Descent}
+  
+With extended sign analysis we proved that this program is safe. The bounded model checker also finds that there is no feasible path.
+
+\textbf{\textcolor{teal}{PASS}}
+
+\subsubsection{Infinite Descent}
 
 \begin{tikzpicture}[%
     ->,
@@ -316,8 +372,18 @@ The division by zero automaton should not lead to a bad state, indeed
           (bad) edge [loop left]                    node {$x:=x+1$} (bad)
           ;
   \end{tikzpicture}
+  
+Clearly this automaton has no feasible path, we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $(x=0) \vee (x=3)$
+\item $\varphi _{q_2}$ = true
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}   
+The bounded model checker also finds that there is no feasible path.
 
-\subsection{Pre Only}
+\textbf{\textcolor{teal}{PASS}}
+\subsubsection{Pre Only}
 
 \begin{tikzpicture}[%
     ->,
@@ -344,9 +410,113 @@ The division by zero automaton should not lead to a bad state, indeed
           ;
   \end{tikzpicture}
 
-\subsection{Sign Non Zero Crucial}
-\subsection{Sign Non Zero Crucial Variant}
-\section{Implementation of BoundedModelChecking.ml}
+Again we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $((x\geq 0) \wedge (y\geq 0)) \vee ((x\leq 0 )\wedge( y\leq 0))$
+\item 
+$\varphi _{q_2}$ = $((x\geq 0) \wedge (y\geq 0)) \vee ((x\leq 0 )\wedge( y\leq 0)) \bigwedge (z=y)$ \\
+$\Leftrightarrow \varphi _{q_2}$ =$((x\geq 0) \wedge (z\geq 0)) \vee ((x\leq 0 )\wedge( z\leq 0)) \bigwedge (z=y)$
+\item $\varphi _{q_3}$ = $((x < 0 )\wedge( z\leq 0)) \bigwedge (z=y)$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}   
+
+The bounded model checker also finds that there is no feasible path.
+
+\textbf{\textcolor{teal}{PASS}}
+
+\subsubsection{Sign Non Zero Crucial}
+\begin{tikzpicture}[%
+    ->,
+    shorten >=1pt,
+    >=stealth,
+    node distance=7cm,
+    noname/.style={%
+      ellipse,
+      minimum width=5em,
+      minimum height=3em,
+      draw
+    }
+  ]
+    \node[noname] (0)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=2cm and 1cm,below right=of 0]    {$q_{1}$};
+    \node[noname] (2) [node distance=2cm, right=of 1] {$q_{2}$};
+    \node[noname] (3) [node distance=2cm and 1cm,below left=of 0]   {$q_{3}$};
+    \node[noname] (4) [node distance=5cm,below=of 0]   {$q_{4}$};
+    \node[noname, red] (bad) [node distance=2cm,right=of 4]   {$q_{bad}$};
+
+    \path (0) edge [right]                    node {$x >= 0$} (1)
+          (0) edge [left]                    node {$x < 0$} (3)
+          (1) edge [bend right=20pt,below]     node {$x<10$} (2)
+          (1) edge [right]                   node {$x >= 10$} (4)
+          (2) edge [bend right=20pt, above]   node {$x:=(x+1)$} (1)
+          (3) edge [loop left]   node {$x:=(x-1)$} (3)
+          (3) edge [left]   node {$x<=10$} (4)
+          (4) edge [above]   node {$x==0$} (bad)
+          ;
+  \end{tikzpicture}
+  
+  
+Again we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $(x\geq 0)$
+\item $\varphi _{q_2}$ = $(x\geq 0) \wedge (x<10)$
+\item $\varphi _{q_3}$ = $(x < 0)$
+\item $\varphi _{q_4}$ = $(x < 0 )\vee( x\geq 10)$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}   
+
+The bounded model checker also finds that there is no feasible path.
+ 
+\textbf{\textcolor{teal}{PASS}}
+ 
+\subsubsection{Sign Non Zero Crucial Variant}
+\begin{tikzpicture}[%
+    ->,
+    shorten >=1pt,
+    >=stealth,
+    node distance=7cm,
+    noname/.style={%
+      ellipse,
+      minimum width=5em,
+      minimum height=3em,
+      draw
+    }
+  ]
+    \node[noname] (0)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=2cm and 1cm,below right=of 0]    {$q_{1}$};
+    \node[noname] (2) [node distance=2cm, right=of 1] {$q_{2}$};
+    \node[noname] (3) [node distance=2cm and 1cm,below left=of 0]   {$q_{3}$};
+    \node[noname] (4) [node distance=5cm,below=of 0]   {$q_{4}$};
+    \node[noname, red] (bad) [node distance=2cm,right=of 4]   {$q_{bad}$};
+
+    \path (0) edge [right]                    node {$x:=2$} (1)
+          (0) edge [left]                    node {$x:=-3$} (3)
+          (1) edge [bend right=20pt,below]     node {$x<10$} (2)
+          (1) edge [right]                   node {$x >= 10$} (4)
+          (2) edge [bend right=20pt, above]   node {$x:=(x+1)$} (1)
+          (3) edge [loop left]   node {$x:=(x-1)$} (3)
+          (3) edge [left]   node {$x<=10$} (4)
+          (4) edge [above]   node {$x==0$} (bad)
+          ;
+  \end{tikzpicture}
+  
+Again we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $(x > 0)$
+\item $\varphi _{q_2}$ = $(x > 0)\wedge(x < 10)$
+\item $\varphi _{q_3}$ = $(x < 0)$
+\item $\varphi _{q_4}$ = $(x < 0)\vee(x \geq 10)$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}   
+
+The bounded model checker also finds that there is no feasible path.
+ 
+\textbf{\textcolor{teal}{PASS}}
+
+
 
 \section{Conclusions}
 \section{The Ocaml debugger}

@@ -65,7 +65,6 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
               path := List.append [(cmd, current)] !path;
               if (is_satisfiable solver = false) then
                 (
-                  Format.printf "Popping from slover for unsat " ;
                   Solver.pop solver 1;
                   depth := !depth - 1;
                   path := List.tl !path;
@@ -100,7 +99,6 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
 
 
 let search automaton bound =
-  Format.printf "Beginning of search\n";
   depth := 0;
   Hashtbl.reset visited_ht;
   bound_reached := false;
@@ -110,8 +108,6 @@ let search automaton bound =
   and solver = (Solver.mk_simple_solver ctx) 
   in
   depth_first_search ctx solver automaton bound (Command.Skip, init);
-  Format.printf "Bound is reached %s \n" (string_of_bool !bound_reached) ;
-
   (* If bad_path is not empty we have found a valid path that leads to the bad state *) 
   if !bad_path <> [] then
     (
