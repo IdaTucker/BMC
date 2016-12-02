@@ -7,6 +7,7 @@ DOC_FLAGS  += -hide Pervasives, -hide-warnings
 REPORT = report.tex
 SRC = src/
 TEST = test/
+EX = examples/
 
 # Default target
 all: bmc.d.byte
@@ -26,7 +27,7 @@ test: FORCE runtests.d.byte
 
 clean: FORCE
 	ocamlbuild -quiet -clean
-	rm -rf report.aux report.log report.out	report.pdf report.pyg *~ $(SRC)*~ $(TEST)*~
+	rm -rf report.aux report.log report.out	report.pdf report.pyg *~ $(SRC)*~ $(TEST)*~ $(EX)*~
 
 
 FORCE:

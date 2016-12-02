@@ -1,0 +1,7 @@
+Init_Is_Final
+{
+    var x;
+
+    initial q_0;
+    final q_0;
+}

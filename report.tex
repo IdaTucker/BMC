@@ -24,6 +24,10 @@
 }
 \definecolor{ao(english)}{rgb}{0.0, 0.5, 0.0}
 \usepackage{xcolor}
+\renewcommand{\labelitemi}{$\bullet$}
+\renewcommand{\labelitemii}{$\cdot$}
+\renewcommand{\labelitemiii}{$\diamond$}
+\renewcommand{\labelitemiv}{$\ast$}
 %\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
 %\let\oldtriangleleft\triangleleft
 %\DeclareRobustCommand\bowtie{\mathrel\triangleright\joinrel\mathrel\oldtriangleleft}
@@ -74,7 +78,7 @@ Now we have established how to keep track of the added formulas, let us see how 
 The commands are our program operations. In order to transform the program operation into a list of formulas we first need to determine what command is being applied.
 Therefore, the \textcolor{blue}{formula} method pattern matches the input command \textit{\textcolor{blue}{cmd}} with the appropriate sort. According to the the matched sort, the appropriate function \textcolor{blue}{apply\_skip}, \textcolor{blue}{apply\_guard} or \textcolor{blue}{apply\_assign} is called. 
 
-\begin{minted}{c}
+\begin{minted}{ocaml}
   match cmd with
   | Command.Skip ->
      List.iter (apply_skip ctx  i ) vars;
@@ -124,25 +128,154 @@ In order to build the assignment formula we match the expression assigned to $x^
 
   
 \section{Implementation of BoundedModelChecking.ml}
+\subsection{Marking locations as visited}
+In order to keep a reccord of which locations have already been visited by the depth first search performed by this module, the hashtable \texttt{visited\_ht}, global to the module, binds a location to the value 1 when it is visited. On entering the \texttt{\textcolor{blue}{depth\_first\_search}} function, if the current location has been visited, no action is taken and the function returns unit. If the location has not yet been visited we propagate our depth first search.
+
+
+\subsection{Kepping track of path and depth of search}
+
+\begin{itemize}
+\item The gobal variable \texttt{depth} is incremented every time we apply \texttt{\textcolor{blue}{depth\_first\_search}} to a child node.
+\item The gobal variable \texttt{path} is a list of pairs \texttt{(command, location)} that keeps track of the edges of the CFA taken to get to the current location.
+\item The gobal variable \texttt{bad\_path} is a list of pairs \texttt{(command, location)} that lead to the final location, if such a path of depth lower than \texttt{bound} exists. If no such path exists (or has been discoverred yet) \texttt{bad\_path} is the empty list.
+\item \texttt{bound\_reached} is a boolean, initally set to \texttt{false}, to which we assign the value \texttt{true} if there exists a path along which the bound is reached before encountering the final location or an unreachable location.
+\end{itemize}
+
+
+\subsection{Building the path and the path formula}
+\paragraph{}
+Every time a new branch of the CFA is explored, the \texttt{\textcolor{blue}{depth\_first\_search}} function checks if the location has been visited, if so it returns, if not it marks the location as visited. 
+
+Next it checks if \texttt{bad\_path} is empty, if not it returns. 
+
+If \texttt{bad\_path} is empty, it checks if the \texttt{bound} has been reached, if so it returns.
+
+Otherwise we are in the valid situation where the program should continue the depth first search. In this situation the following logic is applied:
+
+\begin{itemize}
+\item Create a new scope for the solver by saving the current stack size: pushing the solver will enable us to backtrack later on if we reach the \texttt{bound} or an unfeasible path.
+\item Call \texttt{\textcolor{blue}{Semantics.}formula} on the program operation for the current depth in order to convert the command into a propositional logic formula.
+\item Add the formula to the solver.
+\item Add the pair \texttt{(command, location)} to the \texttt{path} list.
+\item Check the satisfiability of the solver. At this point, three situations may arrise:
+\begin{enumerate}
+\item{The solver is not satisfiable, in which case we backtrack:
+\begin{itemize}
+\item restore the previous context by popping the solver
+\item decrease the depth by one
+\item remove the last pair \texttt{(command, location)} that was added to \texttt{path}
+\item return \texttt{unit}.
+\end{itemize}
+}
+\item The solver is satisfiable and we have reached the final location. In this case we assign \texttt{path} to \texttt{bad\_path} and return \texttt{unit}.
+\item The solver is satisfiable, thus the location is reachable, and the location is not the final location. In this situation we iterate through all locations accessible from the current location and apply \texttt{\textcolor{blue}{depth\_first\_search}}.
+\end{enumerate}
+\end{itemize}
+
+\subsection{Searching for a path to the final state}
+\paragraph{}
+The \texttt{\textcolor{blue}{search}} function brings all the above functionality together.
+It first initialises the global variables before calling \texttt{\textcolor{blue}{depth\_first\_search}} on the initial location with the command skip.
+
+If after calling \texttt{\textcolor{blue}{depth\_first\_search}} the \texttt{bad\_path} list is not empty, then the depth first search found a feasible path to the final location and we return \texttt{Path bad\_path}.
+
+If no path to the final state was found, and if the bound was reached, we do not know if the program is safe, we only know that there is no path to the final state in less than \texttt{bound} steps. In this case the \texttt{bound\_reached} variable is true, and we return \texttt{Empty \textcolor{teal}{false}}.
+
+Otherwise, all feasible paths of have been explored and none lead to the final state. The program is safe and we return \texttt{Empty \textcolor{teal}{true}}.
 
 
 \section{Tests}
 Added test to \texttt{semantics.assign} for the division of an expression by a constant. We add a formula that asserts the integer constant is non zero.
-\begin{minted}{c}
+\begin{minted}{ocaml}
 [z := (x / 2)]^1: expects `{(= z$2 (div x$1 2)), (= x$1 x$2),
 				(= y$1 y$2), (not (= 2 0))}'
 \end{minted}
 Added test to \texttt{semantics.assign} for the division of an expression by an expression that is neither a constant nor a variable.
-\begin{minted}{c}
+\begin{minted}{ocaml}
 [z := (x / (y + 3))]^1: expects `{(= z$2 (div x$1 (+ y$1 3))), (= x$1 x$2),
 				(= y$1 y$2), (not (= (+ y$1 3) 0))}'
 \end{minted}
 
 \subsection{New Automatons}
 For testing purposes, additional automatons have been created in the \texttt{examples} folder in order to test edge cases, the case where no feasible path is found in less than 10 iterations, potential infinite loops.
-\subsubsection{Initial state is bad state}
-\subsubsection{Initial state skips to bad state}
-\subsubsection{Final state reached in 11 iterations}
+\subsubsection{PASS: Looping on a state until getting to a state where the final location can be reached}
+We exepct the following automaton to find a path to thefinal state:
+\begin{minted}{ocaml}
+Loop_Location_Bad
+{
+    var x;
+
+    initial q_0;
+    final q_2;
+
+    from q_0
+    | x := 5 --> q_1;
+
+    from q_1
+    | x:= x-1 --> q_2;
+}
+\end{minted}
+
+\begin{tikzpicture}[%
+    ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
+      ellipse,minimum width=5em, minimum height=3em,draw}
+  ]
+    \node[noname] (ini)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=2cm, right=of ini]    {$q_{1}$};
+    \node[noname] (bad) [node distance=2cm, right=of 1]   {$q_{bad}$};
+    \path (ini) edge [above]                  node {$x:=5$} (1)
+    	  (1)   edge [loop above]             node {$x:=x-1$} (1)
+          (1)   edge [above]                  node {$x==0$} (bad)
+          ;
+  \end{tikzpicture}
+
+
+\subsubsection{FAIL: Always negative}
+\begin{tikzpicture}[%
+    ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
+      ellipse,minimum width=5em, minimum height=3em,draw}
+  ]
+    \node[noname] (ini)                                        {$q_{0}$};
+    \node[noname] (1) [node distance=2cm, right=of ini]        {$q_{1}$};
+    \node[noname, red] (bad) [node distance=2cm, right=of 1]   {$q_{bad}$};
+    \path (ini) edge [above]                  node {$x:=-3$}  (1)
+    	  (1)   edge [loop above]             node {$x:=x-1$} (1)
+          (1)   edge [above]                  node {$x==0$}   (bad)
+          ;
+  \end{tikzpicture}
+
+The above automaton should be safe, since we have a safe inductive invariant:
+\begin{itemize}
+\item $\varphi _{q_0}$ = true
+\item $\varphi _{q_1}$ = $ x < 0$
+\item $\varphi _{q_{bad}}$ = false
+\end{itemize}
+However the \texttt{Loop\_Location\_Bad} returns a feasible path:
+\begin{minted}{ocaml}
+Feasible path:
+   q_0
+      >> x := -3 >>
+   q_1
+      >> x := (x - 1) >>
+   q_2
+
+\end{minted}
+
+
+
+
+
+\subsubsection{PASS: Initial state is bad state}
+\begin{minted}{ocaml}
+Init_Is_Final
+{
+    var x;
+
+    initial q_0;
+    final q_0;
+}
+\end{minted}
+\subsubsection{PASS: Initial state skips to bad state}
 \subsubsection{Final state reached in 11 iterations}
 \subsection{Existing Automaton examples}
 \subsubsection{Division by zero}

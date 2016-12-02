@@ -10,7 +10,6 @@
  * exploration of the program automaton (viewed as a graph).
  *)
 open Z3
-(* let path_ht = Hashtbl.create 10;;*)
 let visited_ht = Hashtbl.create 100;;
 let path = ref [];;
 let bad_path = ref [];;
@@ -56,41 +55,28 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
           let vars =  Automaton.variables automaton
           and children = Automaton.succ automaton current
           in
-          if (current <> (Automaton.initial automaton)) then
+          depth := !depth + 1;
+          Solver.push solver;
+          let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
+          Solver.add solver [f] ;
+          path := List.append [(cmd, current)] !path;
+          if (is_satisfiable solver = false) then
             (
-              depth := !depth + 1;
-              Solver.push solver;
-              let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
-              Solver.add solver [f] ;
-              path := List.append [(cmd, current)] !path;
-              if (is_satisfiable solver = false) then
-                (
-                  Solver.pop solver 1;
-                  depth := !depth - 1;
-                  path := List.tl !path;
-                  ()
-                )
-              else if (current = (Automaton.final automaton)) then
-                (
-                  bad_path := !path;
-                  ()
-                )
-              else
-                (
-                  (*let next_bound = bound + 1 in*)
-                  List.iter
-                    ( depth_first_search ctx solver automaton bound ) children;
-                  Solver.pop solver 1;
-                  depth := !depth - 1;
-                  ()
-                )
+              Solver.pop solver 1;
+              depth := !depth - 1;
+              path := List.tl !path;
+              ()
+            )
+          else if (current = (Automaton.final automaton)) then
+            (
+              bad_path := !path;
+              ()
             )
           else
             (
-              (*let next_bound = bound + 1 in*)
-              depth := !depth + 1;
               List.iter
-                (depth_first_search ctx solver automaton bound ) children;
+                ( depth_first_search ctx solver automaton bound ) children;
+              Solver.pop solver 1;
               depth := !depth - 1;
               ()
             )
@@ -111,7 +97,8 @@ let search automaton bound =
   (* If bad_path is not empty we have found a valid path that leads to the bad state *) 
   if !bad_path <> [] then
     (
-      let ordered_bad_path = List.rev !bad_path in
+      (* Reverse order of the list and remove (init,skip) *)
+      let ordered_bad_path = List.tl (List.rev !bad_path) in
       Path ordered_bad_path
     )
   (* Otherwise, if the bound has been reached,
