@@ -1,0 +1,10 @@
+Init_Is_Final
+{
+    var x;
+
+    initial q_0;
+    final q_1;
+
+    from q_0
+    | skip --> q_1;
+}

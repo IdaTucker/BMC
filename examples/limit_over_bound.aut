@@ -1,4 +1,4 @@
-Always_Negative
+Limit_Over_Bound
 {
     var x;
 
@@ -6,7 +6,7 @@ Always_Negative
     final q_2;
 
     from q_0
-    | x := -3 --> q_1;
+    | x := 9 --> q_1;
 
     from q_1
     | x:= x-1 --> q_1;

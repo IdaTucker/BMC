@@ -9,5 +9,6 @@ Loop_Location_Bad
     | x := 5 --> q_1;
 
     from q_1
-    | x:= x-1 --> q_2;
+    | x:= x-1 --> q_1;
+    | x==0 --> q_2;
 }

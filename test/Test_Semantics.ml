@@ -30,6 +30,7 @@ let aux cmd k expected =
 
 let test_assign () =
   aux (x := cst 3) 0 "{(= y$0 y$1), (= z$0 z$1), (= x$1 3)}";
+  aux (x := x - cst 1) 0 "{(= y$0 y$1), (= z$0 z$1), (= x$1 (- x$0 1))}";
   aux (z := x - y) 2 "{(= z$3 (- x$2 y$2)), (= x$2 x$3), (= y$2 y$3)}" ;
   aux (z := x / y) 1 "{(= z$2 (div x$1 y$1)), (= x$1 x$2), (not (= y$1 0)), (= y$1 y$2)}";
   aux (z := x / (y + cst 3)) 1 "{(= z$2 (div x$1 (+ y$1 3))), (= x$1 x$2), (= y$1 y$2), (not (= (+ y$1 3) 0))}";

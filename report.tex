@@ -198,24 +198,25 @@ Added test to \texttt{semantics.assign} for the division of an expression by an 
 
 \subsection{New Automatons}
 For testing purposes, additional automatons have been created in the \texttt{examples} folder in order to test edge cases, the case where no feasible path is found in less than 10 iterations, potential infinite loops.
-\subsubsection{PASS: Looping on a state until getting to a state where the final location can be reached}
-We exepct the following automaton to find a path to thefinal state:
-\begin{minted}{ocaml}
-Loop_Location_Bad
-{
-    var x;
 
-    initial q_0;
-    final q_2;
+\subsubsection{Initial state is bad state}
+\paragraph{Test}
+This tests the edge case where the initial and final location are the same node.
+\paragraph{Expected result}
+We expect a feasible path that is simply the initial location (no commands).
+\paragraph{Obtained result}
+\textbf{\textcolor{teal}{PASS}}
 
-    from q_0
-    | x := 5 --> q_1;
 
-    from q_1
-    | x:= x-1 --> q_2;
-}
-\end{minted}
+\subsubsection{Initial state skips to bad state}
+\paragraph{Test}
+This tests the edge case where the initial location skips to the final location.
+\paragraph{Expected result}
+We expect a feasible path that is simply a skip from the initial location to the final location.
+\paragraph{Obtained result}
+\textbf{\textcolor{teal}{PASS}}
 
+\subsubsection{Looping until reaching the final location}
 \begin{tikzpicture}[%
     ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
       ellipse,minimum width=5em, minimum height=3em,draw}
@@ -228,9 +229,59 @@ Loop_Location_Bad
           (1)   edge [above]                  node {$x==0$} (bad)
           ;
   \end{tikzpicture}
+\paragraph{Test:}
+Ensuring that the program will loop on a single state in order to reach the final node.
+\paragraph{Expected result:}
+We exepct bounded model checker to find a path to the final state.
 
+\paragraph{Obtained result:}
 
-\subsubsection{FAIL: Always negative}
+\begin{minted}{ocaml}
+Feasible path:
+   q_0
+      >> x := 5 >>
+   q_1
+      >> x := (x - 1) >>
+   q_1
+      >> x := (x - 1) >>
+   q_1
+      >> x := (x - 1) >>
+   q_1
+      >> x := (x - 1) >>
+   q_1
+      >> x := (x - 1) >>
+   q_1
+      >> x == 0 >>
+   q_2
+
+\end{minted}
+
+\textbf{\textcolor{teal}{PASS}}
+
+\subsubsection{Limit under and limit over \texttt{bound}}
+\begin{tikzpicture}[%
+    ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
+      ellipse,minimum width=5em, minimum height=3em,draw}
+  ]
+    \node[noname] (ini)                                                {$q_{0}$};
+    \node[noname] (1) [node distance=4cm, right=of ini]    {$q_{1}$};
+    \node[noname] (bad) [node distance=2cm, right=of 1]   {$q_{bad}$};
+    \path (ini) edge [above]                  node {$x:=8 \mbox{ (under bound) }$} (1)
+    	  (ini) edge [below]                  node {$x:=9 \mbox{ (over bound) }$} (1)
+    	  (1)   edge [loop above]             node {$x:=x-1$} (1)
+          (1)   edge [above]                  node {$x==0$} (bad)
+          ;
+  \end{tikzpicture}
+\paragraph{Test:}
+These tests check that if the CFA requires exactly 10 steps to the bad state then the \texttt{bad\_path} is found, if it requires one more step then no feasible path of length $\leq 10$ is found.
+\paragraph{Expected result:}
+Limit under bound should find a path to the final state.
+Limit over bound should find no feasible path of length $\leq 10$.
+\paragraph{Obtained result:}
+\textbf{\textcolor{teal}{PASS}}
+
+  
+\subsubsection{Always negative}
 \begin{tikzpicture}[%
     ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
       ellipse,minimum width=5em, minimum height=3em,draw}
@@ -243,40 +294,87 @@ Loop_Location_Bad
           (1)   edge [above]                  node {$x==0$}   (bad)
           ;
   \end{tikzpicture}
-
-The above automaton should be safe, since we have a safe inductive invariant:
+\paragraph{Test}
+Ensure the above automaton cannot find a bad path, since we have a safe inductive invariant:
 \begin{itemize}
 \item $\varphi _{q_0}$ = true
 \item $\varphi _{q_1}$ = $ x < 0$
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}
-However the \texttt{Loop\_Location\_Bad} returns a feasible path:
-\begin{minted}{ocaml}
-Feasible path:
-   q_0
-      >> x := -3 >>
-   q_1
-      >> x := (x - 1) >>
-   q_2
+\paragraph{Expected result:}
+No path to the final state should be found.
+\paragraph{Obtained result:}
+The bounded model checker does not garantee the safety of the the pogram but whatever the \texttt{bound} set, it finds no feasible path to the error state of length $\leq$ \texttt{bound}.
+\textbf{\textcolor{teal}{PASS}}
 
-\end{minted}
+\subsubsection{Unsafe program}
+\begin{tikzpicture}[%
+    ->,
+    shorten >=1pt,
+    >=stealth,
+    node distance=7cm,
+    noname/.style={%
+      ellipse,
+      minimum width=5em,
+      minimum height=3em,
+      draw
+    }
+  ]
+    \node[noname] (1)                                   {$q_{1}$};
+    \node[noname] (2) [node distance=2cm,right=of 1]    {$q_{2}$};
+    \node[noname] (3) [node distance=2cm,right=of 2]    {$q_{3}$};
+    \node[noname] (6) [node distance=2cm,below=of 2]    {$q_{6}$};
+    \node[noname] (7) [node distance=1.5cm and 1cm,below left=of 6]    {$q_{7}$};
+    \node[noname] (8) [node distance=0.2cm and 2,above left=of 6]    {$q_{8}$};
+    \node[noname] (11) [node distance=2cm,below =of 3]   {$q_{11}$};
+    \node[noname] (12) [node distance=2cm,below=of 11]   {$q_{12}$};
+    \node[noname, red] (bad) [node distance=2cm,right=of 12]   {$q_{bad}$};
 
+    \path (1) edge  [above]                  node {$x := 1$}   (2)
+          (2) edge  [above]                  node {$y <= 10$}  (3)
+          (2) edge  [right]                  node {$y >7$}    (6)
+          (3) edge  [right]                  node {$y := 10$}  (11)
+          (6) edge  [bend left=10pt, below]  node {$x < y$}    (7)
+          (6) edge  [above]                  node {$x >= y$}   (11) 
+          (7) edge  [bend left=10pt, left]   node {$x := (x-1)$} (8)
+          (8) edge  [bend left=10pt, above]  node {$y := (y-2)$} (6)
+          (11) edge [right]                  node {$x := (y+1)$} (12)
+          (12) edge [above]                  node {$x <= 0$}     (bad)
+          ;
+  \end{tikzpicture}
+\paragraph{Test}
+This tests that for a slightly more complex unsafe program, the bounded model checker finds a path to the final state.
 
+\paragraph{Expected result}
+We expect a feasible path that is simply a skip from the initial location to the final location. However only for a big enough bound.
+\paragraph{Obtained result}
+For a bound of 26 a feasible path is found.
 
+\textbf{\textcolor{teal}{PASS}}
 
+\subsubsection{Recognizing fixed points}
+\begin{tikzpicture}[%
+    ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
+      ellipse,minimum width=5em, minimum height=3em,draw}
+  ]
+    \node[noname] (ini)                                        {$q_{0}$};
+    \node[noname] (1) [node distance=2cm, right=of ini]        {$q_{1}$};
+    \node[noname, red] (bad) [node distance=2cm, right=of 1]   {$q_{bad}$};
+    \path (ini) edge [above]                  node {$x:=9$}  (1)
+    	  (1)   edge [loop above]             node {$skip$} (1)
+          (1)   edge [above]                  node {$x==0$}   (bad)
+          ;
+  \end{tikzpicture}
+\paragraph{Test}
+This tests that the bounded model checker does not get stuck in an infinite loop if the state is the same as a peviously encountered one. Therefore if a location has been visited and the solver obtained when reaching this location is equivalent to a solver previously obtained at this location, do not propagate the depth first search.
 
-\subsubsection{PASS: Initial state is bad state}
-\begin{minted}{ocaml}
-Init_Is_Final
-{
-    var x;
+\paragraph{Expected result}
+We expect the program to be proved as safe, as iterating the loop does not change the state of the program.
+\paragraph{Obtained result}
+No path of length $\leq$ \texttt{bound} is found.
+ 
+\textbf{\textcolor{red}{FAIL}}
 
-    initial q_0;
-    final q_0;
-}
-\end{minted}
-\subsubsection{PASS: Initial state skips to bad state}
-\subsubsection{Final state reached in 11 iterations}
 \subsection{Existing Automaton examples}
 \subsubsection{Division by zero}
 The division by zero automaton should not lead to a bad state, indeed 
@@ -389,7 +487,7 @@ In this exercise we have a safe inductive invariant:
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}
 
-Therefore the program should return that there is no feasable path.
+The bounded model checker finds that there is no feasible path of length $<= 10$.
 
 \textbf{\textcolor{teal}{PASS}}
 
@@ -433,7 +531,7 @@ In this exercise we have a safe inductive invariant:
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}
 
-Therefore the program should return that there is no feasable path.
+The bounded model checker finds that there is no feasible path of length $<= 10$.
 
 \textbf{\textcolor{teal}{PASS}}
 
@@ -453,8 +551,6 @@ Therefore the program should return that there is no feasable path.
     \node[noname] (1)                                   {$q_{1}$};
     \node[noname] (2) [node distance=2cm,right=of 1]    {$q_{2}$};
     \node[noname] (3) [node distance=2cm,right=of 2]    {$q_{3}$};
-    \node[noname] (4) [node distance=2cm,right=of 2]    {$q_{4}$};
-    \node[noname] (5) [node distance=2cm,below=of 2]    {$q_{5}$};
     \node[noname] (6) [node distance=2cm,below=of 2]    {$q_{6}$};
     \node[noname] (7) [node distance=1cm and 2cm,below left=of 6]    {$q_{7}$};
     \node[noname] (8) [node distance=2cm,above=of 7]    {$q_{8}$};
@@ -475,7 +571,7 @@ Therefore the program should return that there is no feasable path.
           ;
   \end{tikzpicture}
   
-With extended sign analysis we proved that this program is safe. The bounded model checker also finds that there is no feasible path.
+With extended sign analysis we proved that this program is safe. The bounded model checker finds that there is no feasible path of length $<= 10$.
 
 \textbf{\textcolor{teal}{PASS}}
 
@@ -600,7 +696,7 @@ Again we have a safe inductive invariant:
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}   
 
-The bounded model checker also finds that there is no feasible path.
+The bounded model checker also finds that there is no feasible path of length $<= 10$.
  
 \textbf{\textcolor{teal}{PASS}}
  
@@ -645,7 +741,7 @@ Again we have a safe inductive invariant:
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}   
 
-The bounded model checker also finds that there is no feasible path.
+The bounded model checker also finds that there is no feasible path of length $<= 10$.
  
 \textbf{\textcolor{teal}{PASS}}
 

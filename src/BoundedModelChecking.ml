@@ -34,58 +34,67 @@ let is_satisfiable solver =
   end
 
 let rec depth_first_search ctx solver automaton bound (cmd, current) =
-  if (Hashtbl.mem visited_ht current) then
+  if (!bad_path <> []) then
     (
+      ()
+    )
+  else if (!depth = bound) then
+    (
+      bound_reached := true;
       ()
     )
   else
     (
-      Hashtbl.add visited_ht current 1;
-      if (!bad_path <> []) then
+      let vars =  Automaton.variables automaton
+      and children = Automaton.succ automaton current
+      in
+      depth := !depth + 1;
+      (*Format.printf "Depth is %s\n" (string_of_int !depth);*)
+      Solver.push solver;
+      let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
+      (*Format.printf "@[Formula f:@ %s@]@." (Expr.to_string f);*)
+      Solver.add solver [f] ;
+      (*
+       TODO: if at a given location, the solver is equivalen to when the node was 
+       previously visited, do not propagate the depth first search
+       TEST: loop_never_sat.aut should retuen no feasible path
+       let assertions = Solver.get_assertions solver in
+       let visited = Hashtbl.find visited_ht current in
+      
+       Hashtbl.add visited_ht current assertions;
+      
+      
+      Format.printf "@[Solver: %s@]@." (Solver.to_string solver);
+      Format.printf "@[Current is: %a@]@." Automaton.Node.print current;
+       *)
+      path := List.append [(cmd, current)] !path;
+      if (is_satisfiable solver = false) then
         (
-          ()
+          Solver.pop solver 1;
+          depth := !depth - 1;
+          path := List.tl !path;
+          () 
         )
-      else if (!depth = bound) then
+      else if (current = (Automaton.final automaton)) then
         (
-          bound_reached := true;
+          bad_path := !path;
           ()
         )
       else
         (
-          let vars =  Automaton.variables automaton
-          and children = Automaton.succ automaton current
-          in
-          depth := !depth + 1;
-          Solver.push solver;
-          let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
-          Solver.add solver [f] ;
-          path := List.append [(cmd, current)] !path;
-          if (is_satisfiable solver = false) then
-            (
-              Solver.pop solver 1;
-              depth := !depth - 1;
-              path := List.tl !path;
-              ()
-            )
-          else if (current = (Automaton.final automaton)) then
-            (
-              bad_path := !path;
-              ()
-            )
-          else
-            (
-              List.iter
-                ( depth_first_search ctx solver automaton bound ) children;
-              Solver.pop solver 1;
-              depth := !depth - 1;
-              ()
-            )
+          List.iter
+            ( depth_first_search ctx solver automaton bound ) children;
+          Solver.pop solver 1;
+          depth := !depth - 1;
+          path := List.tl !path;
+          ()
         )
     )
 
+           
 
 let search automaton bound =
-  depth := 0;
+  depth := -1;
   Hashtbl.reset visited_ht;
   bound_reached := false;
   let ctx = mk_context []
