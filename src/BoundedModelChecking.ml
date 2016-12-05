@@ -10,7 +10,6 @@
  * exploration of the program automaton (viewed as a graph).
  *)
 open Z3
-let visited_ht = Hashtbl.create 100;;
 let path = ref [];;
 let bad_path = ref [];;
 let bound_reached = ref false;;
@@ -34,39 +33,27 @@ let is_satisfiable solver =
   end
 
 let rec depth_first_search ctx solver automaton bound (cmd, current) =
+  (* If we have already found a bad path, stop propagating the search *)
   if (!bad_path <> []) then
     (
       ()
     )
+  (* If we have reached the bound, make note and stop propagating the search *)    
   else if (!depth = bound) then
     (
       bound_reached := true;
       ()
     )
+  (* Otherwise propagate the search *)
   else
     (
       let vars =  Automaton.variables automaton
       and children = Automaton.succ automaton current
       in
       depth := !depth + 1;
-      (*Format.printf "Depth is %s\n" (string_of_int !depth);*)
       Solver.push solver;
       let f = Boolean.mk_and ctx (Semantics.formula ctx vars !depth cmd) in
-      (*Format.printf "@[Formula f:@ %s@]@." (Expr.to_string f);*)
       Solver.add solver [f] ;
-      (*
-       TODO: if at a given location, the solver is equivalen to when the node was 
-       previously visited, do not propagate the depth first search
-       TEST: loop_never_sat.aut should retuen no feasible path
-       let assertions = Solver.get_assertions solver in
-       let visited = Hashtbl.find visited_ht current in
-      
-       Hashtbl.add visited_ht current assertions;
-      
-      
-      Format.printf "@[Solver: %s@]@." (Solver.to_string solver);
-      Format.printf "@[Current is: %a@]@." Automaton.Node.print current;
-       *)
       path := List.append [(cmd, current)] !path;
       if (is_satisfiable solver = false) then
         (
@@ -94,8 +81,10 @@ let rec depth_first_search ctx solver automaton bound (cmd, current) =
            
 
 let search automaton bound =
+  (* Set depth to -1 because we want depth = 0 for init,
+     and depth will be incremented when called with init *)
   depth := -1;
-  Hashtbl.reset visited_ht;
+  (* The bound has not yetr been reached *)
   bound_reached := false;
   let ctx = mk_context []
   in
@@ -103,7 +92,7 @@ let search automaton bound =
   and solver = (Solver.mk_simple_solver ctx) 
   in
   depth_first_search ctx solver automaton bound (Command.Skip, init);
-  (* If bad_path is not empty we have found a valid path that leads to the bad state *) 
+  (* If bad_path is not empty it is a valid path that leads to the bad state *) 
   if !bad_path <> [] then
     (
       (* Reverse order of the list and remove (init,skip) *)

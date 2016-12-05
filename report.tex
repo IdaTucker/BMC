@@ -197,26 +197,58 @@ Added test to \texttt{semantics.assign} for the division of an expression by an 
 \end{minted}
 
 \subsection{New Automatons}
-For testing purposes, additional automatons have been created in the \texttt{examples} folder in order to test edge cases, the case where no feasible path is found in less than 10 iterations, potential infinite loops.
+Additional automatons have been created in the \texttt{examples} folder in order to test edge cases, the case where no feasible path is found in less than 10 iterations,unsafe programs, potential infinite loops...
 
 \subsubsection{Initial state is bad state}
 \paragraph{Test}
-This tests the edge case where the initial and final location are the same node.
+Edge case where the initial and final location are the same node.
 \paragraph{Expected result}
-We expect a feasible path that is simply the initial location (no commands).
+A feasible path that is simply the initial location (no commands).
 \paragraph{Obtained result}
 \textbf{\textcolor{teal}{PASS}}
 
 
 \subsubsection{Initial state skips to bad state}
 \paragraph{Test}
-This tests the edge case where the initial location skips to the final location.
+Edge case where the initial location skips to the final location.
 \paragraph{Expected result}
-We expect a feasible path that is simply a skip from the initial location to the final location.
+A feasible path that is simply a skip from the initial location to the final location.
 \paragraph{Obtained result}
 \textbf{\textcolor{teal}{PASS}}
 
-\subsubsection{Looping until reaching the final location}
+\subsubsection{\texttt{bound} is 0}
+
+\paragraph{Test}
+Test the edge case where the bound is zero and the final location is not the initial location.
+\begin{minted}{ocaml}
+./bmc.d.byte -bound 0 examples/init_skip_final.aut 
+\end{minted}
+\paragraph{Expected result}
+No feasible path of length $\leq 0$.
+\paragraph{Obtained result}
+\begin{minted}{vctreestatus}
+No feasible path of length <= 0
+\end{minted}
+\textbf{\textcolor{teal}{PASS}}
+
+
+\paragraph{Test}
+Test the edge case where the bound is zero and the final location is the initial location.
+\begin{minted}{ocaml}
+./bmc.d.byte -bound 0 examples/init_is_final.aut 
+\end{minted}
+\paragraph{Expected result}
+A feasible path that is simply the initial location (no commands).
+\paragraph{Obtained result}
+\begin{minted}{vctreestatus}
+Feasible path:   q_0
+\end{minted}
+\textbf{\textcolor{teal}{PASS}}
+
+
+
+
+\subsubsection{Looping until reaching the final location}\label{loop-to-final}
 \begin{tikzpicture}[%
     ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
       ellipse,minimum width=5em, minimum height=3em,draw}
@@ -224,18 +256,16 @@ We expect a feasible path that is simply a skip from the initial location to the
     \node[noname] (ini)                                                {$q_{0}$};
     \node[noname] (1) [node distance=2cm, right=of ini]    {$q_{1}$};
     \node[noname] (bad) [node distance=2cm, right=of 1]   {$q_{bad}$};
-    \path (ini) edge [above]                  node {$x:=5$} (1)
+    \path (ini) edge [above]                  node {$x:=3$} (1)
     	  (1)   edge [loop above]             node {$x:=x-1$} (1)
           (1)   edge [above]                  node {$x==0$} (bad)
           ;
   \end{tikzpicture}
 \paragraph{Test:}
-Ensuring that the program will loop on a single state in order to reach the final node.
+Ensure the program will loop on a single state in order to reach the final node.
 \paragraph{Expected result:}
-We exepct bounded model checker to find a path to the final state.
-
+A path to the final state.
 \paragraph{Obtained result:}
-
 \begin{minted}{ocaml}
 Feasible path:
    q_0
@@ -247,16 +277,12 @@ Feasible path:
    q_1
       >> x := (x - 1) >>
    q_1
-      >> x := (x - 1) >>
-   q_1
-      >> x := (x - 1) >>
-   q_1
       >> x == 0 >>
    q_2
 
 \end{minted}
-
 \textbf{\textcolor{teal}{PASS}}
+
 
 \subsubsection{Limit under and limit over \texttt{bound}}
 \begin{tikzpicture}[%
@@ -273,15 +299,24 @@ Feasible path:
           ;
   \end{tikzpicture}
 \paragraph{Test:}
-These tests check that if the CFA requires exactly 10 steps to the bad state then the \texttt{bad\_path} is found, if it requires one more step then no feasible path of length $\leq 10$ is found.
+\texttt{bound} is 10 and:
+\begin{enumerate}
+\item the CFA requires exactly 10 steps to the bad state.
+\item the CFA requires exactly 11 steps to the bad state
+\end{enumerate}
 \paragraph{Expected result:}
-Limit under bound should find a path to the final state.
-Limit over bound should find no feasible path of length $\leq 10$.
+\begin{enumerate}
+\item A path to the final state.
+\item No feasible path of length $\leq 10$.
+\end{enumerate}
 \paragraph{Obtained result:}
 \textbf{\textcolor{teal}{PASS}}
 
   
 \subsubsection{Always negative}
+
+\paragraph{Test} The following CFA
+
 \begin{tikzpicture}[%
     ->,shorten >=1pt,>=stealth,node distance=7cm,noname/.style={%
       ellipse,minimum width=5em, minimum height=3em,draw}
@@ -294,20 +329,22 @@ Limit over bound should find no feasible path of length $\leq 10$.
           (1)   edge [above]                  node {$x==0$}   (bad)
           ;
   \end{tikzpicture}
-\paragraph{Test}
-Ensure the above automaton cannot find a bad path, since we have a safe inductive invariant:
+
+\paragraph{Expected result:}
+No path to the final state should be found, since we have a safe inductive invariant:
 \begin{itemize}
 \item $\varphi _{q_0}$ = true
 \item $\varphi _{q_1}$ = $ x < 0$
 \item $\varphi _{q_{bad}}$ = false
 \end{itemize}
-\paragraph{Expected result:}
-No path to the final state should be found.
 \paragraph{Obtained result:}
-The bounded model checker does not garantee the safety of the the pogram but whatever the \texttt{bound} set, it finds no feasible path to the error state of length $\leq$ \texttt{bound}.
+The bounded model checker does not garantee the safety of the the pogram but whatever the \texttt{bound} set, it finds no feasible path of length $\leq$ \texttt{bound}.\\
 \textbf{\textcolor{teal}{PASS}}
 
 \subsubsection{Unsafe program}
+
+\paragraph{Test}
+Slightly more complex unsafe program:\\
 \begin{tikzpicture}[%
     ->,
     shorten >=1pt,
@@ -342,14 +379,14 @@ The bounded model checker does not garantee the safety of the the pogram but wha
           (12) edge [above]                  node {$x <= 0$}     (bad)
           ;
   \end{tikzpicture}
-\paragraph{Test}
-This tests that for a slightly more complex unsafe program, the bounded model checker finds a path to the final state.
+\paragraph{Expected result}$\exists B_0$ such that:
+\begin{itemize}
+\item $\forall $ \texttt{bound} $< B_0 \rightarrow$ No feasible path of length $\leq 10$.
+\item $\forall $ \texttt{bound} $\geq B_0 \rightarrow$: A path to the final state.
+\end{itemize}
 
-\paragraph{Expected result}
-We expect a feasible path that is simply a skip from the initial location to the final location. However only for a big enough bound.
 \paragraph{Obtained result}
-For a bound of 26 a feasible path is found.
-
+For a bound of 26 a feasible path is found.\\
 \textbf{\textcolor{teal}{PASS}}
 
 \subsubsection{Recognizing fixed points}
@@ -371,9 +408,12 @@ This tests that the bounded model checker does not get stuck in an infinite loop
 \paragraph{Expected result}
 We expect the program to be proved as safe, as iterating the loop does not change the state of the program.
 \paragraph{Obtained result}
-No path of length $\leq$ \texttt{bound} is found.
+No path of length $\leq 10$ is found.
  
 \textbf{\textcolor{red}{FAIL}}
+
+\paragraph{Explanation}
+In fact the bounded model checker will never prove that a program that contains loops is safe for any length of path. It will only prove that there are are not paths of length $\leq$ \texttt{bound} to the final location. The objective of a bounded model checker is to find bugs, and not necessarily to prove that the system is safe, so we can consider this to be expected behavior.
 
 \subsection{Existing Automaton examples}
 \subsubsection{Division by zero}
@@ -745,9 +785,13 @@ The bounded model checker also finds that there is no feasible path of length $<
  
 \textbf{\textcolor{teal}{PASS}}
 
+At a given location, reduce the formula so as to recognize if we have already been i this location with this formula. Indeed the implemented bounded model checker does not check if a location has been \textit{visited}.
 
+If we simply considered a location to be viited if the bounded model checker had already encountered the location, we would not be able to evolve (example \ref{loop-to-final}). The possible valuations of a variable can change for a given location. In that case we want to propagate the changes and carry on the depth first search. 
 
-\section{Conclusions}
+However if we have already encoutered a location with exactly the same possible valuations, an improvement to the bounded model checker would be to recognize this and stop propagating the search.
+
+\section{Improvements}
 \section{The Ocaml debugger}
 Invoked via:
 \begin{minted}{c}
@@ -758,35 +802,6 @@ Setting command line arguments:
 (ocd) set arguments examples/constant_propagation.aut
 (ocd) break @BoundedModelChecking 87
 \end{minted}
-
-
-
-
-Here you briefly summarize your findings.
-
-%++++++++++++++++++++++++++++++++++++++++
-% References section will be created automatically 
-% with inclusion of "thebibliography" environment
-% as it shown below. See text starting with line
-% \begin{thebibliography}{99}
-% Note: with this approach it is YOUR responsibility to put them in order
-% of appearance.
-
-\begin{thebibliography}{99}
-
-\bibitem{melissinos}
-A.~C. Melissinos and J. Napolitano, \textit{Experiments in Modern Physics},
-(Academic Press, New York, 2003).
-
-\bibitem{Cyr}
-N.\ Cyr, M.\ T$\hat{e}$tu, and M.\ Breton,
-% "All-optical microwave frequency standard: a proposal,"
-IEEE Trans.\ Instrum.\ Meas.\ \textbf{42}, 640 (1993).
-
-\bibitem{Wiki} \emph{Expected value},  available at
-\texttt{http://en.wikipedia.org/wiki/Expected\_value}.
-
-\end{thebibliography}
 
 
 \end{document}
