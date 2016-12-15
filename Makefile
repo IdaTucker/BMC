@@ -27,7 +27,7 @@ test: FORCE runtests.d.byte
 
 clean: FORCE
 	ocamlbuild -quiet -clean
-	rm -rf report.aux report.log report.out	report.pdf report.pyg *~ $(SRC)*~ $(TEST)*~ $(EX)*~
+	rm -rf report.aux report.log report.out	report.pyg *~ $(SRC)*~ $(TEST)*~ $(EX)*~
 
 
 FORCE:
