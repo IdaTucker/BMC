@@ -24,7 +24,7 @@ let add_assigned xi f =
   Hashtbl.replace ht key f
 
 let add_non_zero xi f =
-  let key = (Expr.to_string xi) ^ "non-zero" in
+  let key = (Expr.to_string xi) ^ "-non-zero" in
   Hashtbl.add ht key f
 
 let apply_skip ctx i var =
